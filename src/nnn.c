@@ -151,7 +151,7 @@
 #endif
 
 /* Macro definitions */
-#define VERSION      "5.3"
+#define VERSION      "5.3-blackpaw.1"
 #define GENERAL_INFO "BSD 2-Clause\nhttps://github.com/jarun/nnn"
 
 #ifndef NOSSN
@@ -440,6 +440,11 @@ typedef struct {
 
 /* Configuration, contexts */
 static settings cfg = {
+	.showhidden = 1,
+	.showdetail = 1,
+	.fileinfo = 1,
+	.useeditor = 1,
+	.fuzzy = 1,
 	.ctxactive = 1,
 	.autoenter = 1,
 	.timetype = 2, /* T_MOD */
@@ -581,7 +586,7 @@ alignas(max_align_t) static char g_tmpfpath[TMP_LEN_MAX];
 alignas(max_align_t) static char g_pipepath[TMP_LEN_MAX];
 
 /* Non-persistent runtime states */
-static runstate g_state = {.lastctx = CTX_INVALID, .closedctx = CTX_INVALID};
+static runstate g_state = {.uidgid = 1, .showlines = 1, .lastctx = CTX_INVALID, .closedctx = CTX_INVALID};
 
 /* Options to identify file MIME */
 #ifdef __APPLE__
@@ -5139,9 +5144,9 @@ static void printent(int pdents_index, uint_t namecols, bool sel)
 
 	if (cfg.showdetail) {
 		int type = ent->mode & S_IFMT;
-		char perms[6] = {' ', ' ', (char)('0' + ((ent->mode >> 6) & 7)),
-				(char)('0' + ((ent->mode >> 3) & 7)),
-				(char)('0' + (ent->mode & 7)), '\0'};
+		char perms[6];
+		snprintf(perms, sizeof(perms), " %04o",
+		         (unsigned int)(ent->mode & 07777));
 
 		addch(' ');
 		attrs = g_state.oldcolor ? (resetdircolor(ent->flags), A_DIM)
@@ -8059,6 +8064,16 @@ static void statusbar(char *path)
 	tolastln();
 
 	printw("%d/%d ", cur + 1, ndents);
+
+	if (geteuid() == 0)
+		addstr("[ROOT] ");
+	else
+		printw("[UID:%lu] ", (unsigned long)geteuid());
+
+	if (!cfg.blkorder)
+		printw("Free:%s ", coolsize(get_fs_info(path, VFS_AVAIL)));
+
+	addstr("[Blackpaw] ");
 
 	if (g_state.selmode || nselected) {
 		attron(A_REVERSE);
